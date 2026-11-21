@@ -1,0 +1,11 @@
+// 依据：F:\Agent\ae2wt-dev-1.19.2\settings.gradle:1-10（含 pluginManagement 三仓库）
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    }
+}
+
+rootProject.name = 'ae2order'
+

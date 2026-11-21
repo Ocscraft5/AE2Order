@@ -1,0 +1,14 @@
+# 统一换行，避免 Windows 上提交出 CRLF 噪音
+* text=auto eol=lf
+
+# Windows 脚本保持 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 可执行脚本保持 LF
+gradlew text eol=lf
+
+# 二进制
+*.jar binary
+*.png binary
+*.ico binary

@@ -1,0 +1,36 @@
+# ---- Gradle ----
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- IDE ----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+out/
+
+# ---- 运行目录（gradlew runClient / runServer 会重新生成）----
+run/
+run-server/
+runs/
+
+# ---- 本地产物（发布包请放 hc/，见 docs/VERIFY.md）----
+dist/
+release/
+*.zip
+*.log
+logs/
+
+# ---- 本地暂存区（下载的依赖源码、测试服务器、存档等，只在作者机器上保留）----
+hc/
+
+# ---- OS ----
+Thumbs.db
+desktop.ini
+.DS_Store

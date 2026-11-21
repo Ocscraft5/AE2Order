@@ -1,0 +1,45 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="AE2 Order Helper / AE2 \u4e0b\u5355\u52a9\u624b"
+authors="${mod_authors}"
+description="Middle-click a JEI bookmark or item-list entry to open AE2's craft-amount screen for that network. Supports items and fluids, and works anywhere as long as you carry a wireless terminal. / AE2 \u4e0b\u5355\u52a9\u624b\uff1a\u5728 JEI \u4e66\u7b7e\u6216\u7269\u54c1\u5217\u8868\u4e0a\u4e2d\u952e\u70b9\u51fb\uff0c\u5373\u53ef\u4e3a\u5bf9\u5e94\u7f51\u7edc\u4e0b\u5355\uff08\u652f\u6301\u7269\u54c1\u4e0e\u6d41\u4f53\uff09\uff1b\u53ea\u8981\u8eab\u4e0a\u5e26\u7740\u65e0\u7ebf\u7ec8\u7aef\uff0c\u968f\u65f6\u968f\u5730\u90fd\u80fd\u4e0b\u5355\u3002"
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="ae2"
+    mandatory=true
+    versionRange="${ae2_version_range}"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="jei"
+    mandatory=false
+    versionRange="${jei_version_range}"
+    ordering="AFTER"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="ae2wtlib"
+    mandatory=true
+    versionRange="${ae2wt_version_range}"
+    ordering="AFTER"
+    side="BOTH"

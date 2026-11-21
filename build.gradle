@@ -1,0 +1,334 @@
+// 依据：F:\Agent\ae2wt-dev-1.19.2\build.gradle:1-204（本机实测 build + runClient 通过）
+// 版本字符串说明：AE2 / JEI 的 build number 全部走 gradle.properties 变量，
+//   此处需填【实测 build number】——共给出的是本机实测可用值（见 gradle.properties 注释）。
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+apply plugin: 'org.spongepowered.mixin'
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+        server {
+            // 自写，原因：专用服单独用 run-server 目录，避免与客户端的 run/ 抢 session.lock；
+            //   run-server 不在 run/ 下，因此会使用项目根的 run/mods 作为模组目录。
+            workingDirectory project.file('run-server')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'forge.logging.markers', 'REGISTRIES'
+            args '--nogui'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    // AE2 —— 依据：ae2wt-dev-1.19.2/build.gradle:76-84（modmaven，仅含 appeng 组）
+    maven {
+        name = 'ModMaven'
+        url = 'https://modmaven.dev'
+        content {
+            includeGroup 'appeng'
+        }
+    }
+    // JEI —— 依据：ae2wt-dev-1.19.2/build.gradle:85-89
+    maven {
+        name = "Jared's maven"
+        url = 'https://maven.blamejared.com/'
+    }
+    // 无线终端库：走 Modrinth Maven（modmaven 无该 artifact）
+    // 依据：https://modmaven.dev/de/mari_023/ae2wtlib-forge/ 实测为空目录
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    // 无线终端库备选：CurseForge file id
+    maven {
+        name = 'CurseMaven'
+        url = 'https://cursemaven.com'
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    // 无线终端库的强制前置（cloth-config / architectury / curios）
+    // 依据：AE2WTLib 的 META-INF/mods.toml 实测三者 mandatory=true
+    maven {
+        name = 'Shedaniel'
+        url = 'https://maven.shedaniel.me/'
+        content {
+            includeGroup 'me.shedaniel'
+            includeGroup 'me.shedaniel.cloth'
+        }
+    }
+    maven {
+        name = 'Architectury'
+        url = 'https://maven.architectury.dev/'
+        content {
+            includeGroup 'dev.architectury'
+        }
+    }
+    maven {
+        name = 'IllusiveC4'
+        url = 'https://maven.theillusivec4.top/'
+        content {
+            includeGroup 'top.theillusivec4.curios'
+        }
+    }
+    // 手动 libs/ 目录方式（方式 B）用的 flatDir 仓库
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+configurations {
+    // 自写，原因：copyDeps 需要一条"只含模组 jar"的可解析配置，
+    // 与 compileClasspath 分开可避免把 Forge/MC/库一并复制进 run/mods。
+    modJars {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // ===== 1) AE2：编译 + 运行可见 =====
+    // fg.deobf 前缀的原因：Maven 上的 AE2 是"生产环境 jar"，它按 SRG 名（m_xxxxx_ / f_xxxxx_）
+    //   引用 Minecraft。开发环境用官方（Mojang）映射，方法名是 mouseClicked 之类。
+    //   fg.deobf 会把它重新映射到当前开发映射；否则编译期大面积 "cannot find symbol"，
+    //   运行期表现为 NoSuchMethodError / Mixin 注入失败。
+    implementation fg.deobf("appeng:appliedenergistics2-forge:${ae2_version}")
+
+    // ===== 2) JEI：编译 + 运行可见（客户端） =====
+    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
+    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+    if (project.itemListMod == 'jei') {
+        runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
+    }
+
+    // ===== 3) 无线终端库：运行期 + 编译期都要（按用户要求下进环境） =====
+    if (project.ae2wt_source == 'modrinth') {
+        implementation fg.deobf("maven.modrinth:applied-energistics-2-wireless-terminals:${ae2wt_modrinth_version_id}")
+    }
+    if (project.ae2wt_source == 'curse') {
+        implementation fg.deobf("curse.maven:${ae2wt_curse_slug}:${ae2wt_curse_file_id}")
+    }
+    if (project.ae2wt_source == 'libs') {
+        implementation fg.deobf("local:${ae2wt_libs_name}")
+    }
+
+    // 自写，原因：AE2WTLib 的 META-INF/mods.toml 实测 cloth_config / architectury / curios
+    //   三者 mandatory=true，缺任一则 runClient 直接报 "Missing or unsupported mandatory dependencies"。
+    implementation fg.deobf("me.shedaniel.cloth:cloth-config-forge:${cloth_config_version}")
+    implementation fg.deobf("dev.architectury:architectury-forge:${architectury_version}")
+    implementation fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}")
+
+    // ===== copyDeps 的输入：与上面同源同版本 =====
+    modJars fg.deobf("appeng:appliedenergistics2-forge:${ae2_version}")
+    if (project.itemListMod == 'jei') {
+        modJars fg.deobf("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
+    }
+    if (project.ae2wt_source == 'modrinth') {
+        modJars fg.deobf("maven.modrinth:applied-energistics-2-wireless-terminals:${ae2wt_modrinth_version_id}")
+    }
+    if (project.ae2wt_source == 'curse') {
+        modJars fg.deobf("curse.maven:${ae2wt_curse_slug}:${ae2wt_curse_file_id}")
+    }
+    modJars fg.deobf("me.shedaniel.cloth:cloth-config-forge:${cloth_config_version}")
+    modJars fg.deobf("dev.architectury:architectury-forge:${architectury_version}")
+    modJars fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}")
+
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// 自写，原因：本模组自身**不再包含任何 Mixin**（旧版对 MEStorageScreen#mouseClicked 的注入
+//   已改为普通 Forge 事件监听，见 client/OrderClickHandler）。但 org.spongepowered.mixin 插件必须
+//   继续 apply —— 它会把 Mixin 运行库加入开发期运行 classpath，缺了它 AE2 自带的
+//   ae2.mixins.json（EarlyStartupMixin）在 runClient/runServer 启动时直接致命失败（本机实测）。
+//   因为本模组没有 mixin 配置，下面的 mixin { } 配置块已删除。
+
+// ===== 发布打包（Forge 惯例）=====
+// 自写，原因：Forge 模组标准发布物是“主 jar + sources jar”，
+//   主 jar 必须经过 reobfJar（已实测：方法体里是 SRG 名 f_/m_，可直接放生产环境 mods/）。
+java {
+    withSourcesJar()
+}
+
+// 自写，原因：让产物名带上 MC/Forge 版本，符合社区发布惯例，避免装错版本。
+tasks.named('jar', Jar).configure {
+    archiveFileName = "${mod_id}-${mod_version}+mc${minecraft_version}-forge.jar"
+}
+tasks.named('sourcesJar', Jar).configure {
+    archiveFileName = "${mod_id}-${mod_version}+mc${minecraft_version}-forge-sources.jar"
+    // 自写，原因：sources jar 里混入 build 生成物（如 refmap）会产生重复条目
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// 自写，原因：一条命令产出全部发布物；dist 目录独立于 build/，便于直接拷走分发。
+tasks.register('dist', Copy) {
+    group = 'ae2order'
+    description = '把主 jar 与 sources jar 收集到 dist/ 作为发布物'
+    dependsOn tasks.named('build')
+    from layout.buildDirectory.dir('libs')
+    include '*.jar'
+    into layout.projectDirectory.dir('dist')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    doFirst {
+        // 自写，原因：产物名带版本号，改名后旧 jar 会残留在 dist/ 里造成"发错版本"
+        def dir = layout.projectDirectory.dir('dist').asFile
+        dir.mkdirs()
+        dir.listFiles()?.findAll { it.name.endsWith('.jar') }?.each { it.delete() }
+    }
+
+    doLast {
+        def dir = layout.projectDirectory.dir('dist').asFile
+        logger.lifecycle('[dist] 发布物:')
+        dir.listFiles()?.findAll { it.name.endsWith('.jar') }?.sort { it.name }?.each {
+            logger.lifecycle('  - ' + it.name + '  (' + it.length() + ' bytes)')
+        }
+    }
+}
+
+// ===== 复制依赖进 run/mods =====
+// 铁律：run/mods 里的 jar 必须与 build.gradle（= modJars 配置）声明的版本完全一致，
+// 二者不同源会得到"开发期一个版本、运行期另一个版本"的假象，
+// 典型症状是 Mixin 注入失败或 NoSuchMethodError。
+tasks.register('copyDeps', Copy) {
+    group = 'ae2order'
+    description = '把 build.gradle 声明的模组 jar 复制进 run/mods（与声明版本严格一致）'
+
+    into layout.projectDirectory.dir('run/mods')
+
+    // 自写，原因：模组 jar 内可能含重复条目（签名文件等），Copy 默认会报错
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    doFirst {
+        def dir = layout.projectDirectory.dir('run/mods').asFile
+        dir.mkdirs()
+        // 自写，原因：清掉上一次残留的不同版本 jar，避免版本错位
+        dir.listFiles()?.findAll { it.name.endsWith('.jar') }?.each { it.delete() }
+    }
+
+    doLast {
+        def dir = layout.projectDirectory.dir('run/mods').asFile
+        def names = dir.listFiles()?.findAll { it.name.endsWith('.jar') }?.collect { it.name }?.sort() ?: []
+        logger.lifecycle('[copyDeps] run/mods 内容（必须与 build.gradle 声明版本一致）:')
+        names.each { logger.lifecycle('  - ' + it) }
+    }
+}
+
+// 自写，原因：modJars 配置要等 ForgeGradle 完成配置后才可解析，
+//   而 afterEvaluate 不能写在 tasks.register 闭包内（实测报
+//   "Project#afterEvaluate(Closure) on root project 'xiadan' cannot be executed in the current context"）。
+afterEvaluate {
+    tasks.named('copyDeps', Copy).configure {
+        from configurations.modJars
+        // 方式 B 下若要顺带把 libs/ 里的 jar 放进 run/mods：
+        // if (project.ae2wt_source == 'libs') {
+        //     from(fileTree('libs') { include '*.jar' })
+        // }
+    }
+}
+
+// 说明：旧版存在的 copyMixinRefmap 任务已删除 —— 本模组不再包含 Mixin，没有 refmap 需要搬运。
+//   （旧问题：MixinGradle 把 refmap 生成到 build/tmp/compileJava/，而 runClient 用
+//    build/resources/main 的 exploded 目录，缺文件会导致 @Shadow 无法定位。）
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+            ae2_version_range      : ae2_version_range,
+            jei_version_range      : jei_version_range,
+            ae2wt_version_range    : ae2wt_version_range
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    // 自写，原因：sources jar 与主 jar 都可能带同名条目（如 mixin 配置/refmap 的残留），
+    //   默认策略会直接报 "Entry ... is a duplicate but no duplicate handling strategy has been set"。
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // 自写，原因：许可证合规 —— 发布物里必须自带本模组的许可证全文与第三方声明，
+    //   这样任何人拿到 jar 就能看到“谁的东西、什么许可、有没有复制别人的代码”。
+    from(rootProject.file('LICENSE'))
+    from(rootProject.file('GPL-3.0.txt'))
+    from(rootProject.file('THIRD-PARTY-NOTICES.md'))
+
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
